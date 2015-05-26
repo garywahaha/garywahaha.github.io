@@ -1,8 +1,16 @@
-<html>
-<head>Hello</head>
+---
+layout: default
+title: My Blog
+---
 
-<body>
-Hello World
-</body>
+<h2>{{ page.title }}</h2>
 
-</html>
+<ul>
+
+{% for post in site.posts %}
+
+	<li>{{ post.date | date_to_string }} <a href="{{ site.baseurl }}{{ post.url }}">{{ post.title }}</a></li>
+
+{% endfor %}
+
+</ul>
