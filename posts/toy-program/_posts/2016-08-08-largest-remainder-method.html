@@ -1,0 +1,206 @@
+---
+title: Largest Remainder Method
+---
+
+<div class="basic-info">
+  <input id="total-seat" class="form-control" type="text"></input>
+</div>
+
+<div class="row team-row"></div>
+
+<div class="btn-action">
+  <button class="btn btn-default btn-add-team">Add Team</button>
+  <button class="btn btn-default btn-calc">Calculate</button>
+</div>
+
+<div id="chart"></div>
+
+<div id="team-default" class="col-xs-4 hidden team">
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      <div class="input-group">
+        <input class="form-control team-title" type="text"></input>
+        <span class="input-group-btn">
+          <button class="btn btn-primary btn-remove-team">x</button>
+        </span>
+      </div>
+    </div>
+    <div class="panel-body team-body">
+      <ul class="list-unstyled name-list"></ul>
+      <button class="btn btn-default btn-add-name">Add</button>
+
+      <div class="vote">
+        <label>得票:</label>
+        <input type="number" min="0" class="form-control team-vote"></input>
+      </div>
+    </div>
+  </div>
+</div>
+
+<li id="name-default" class="hidden">
+  <div class="input-group">
+    <input class="form-control team-member" type="text"></input>
+    <span class="input-group-btn">
+      <button class="btn btn-primary btn-remove-name">x</button>
+    </span>
+  </div>
+</li>
+
+<!-- UI Handler -->
+<script>
+$(document).ready(function(){
+  var $team_default = $('#team-default');
+  var $name_default = $('#name-default');
+
+  $(document).on('click', '.btn-add-name', function(event){
+    var $name_list = $(event.target).closest('.team-body').find('ul.name-list');
+    $name_list.append($name_default.clone().removeClass('hidden').removeAttr('id'));
+  });
+
+  $(document).on('click', '.btn-remove-name', function(event){
+    $(event.target).closest('li').remove();
+  });
+
+  $(document).on('click', '.btn-remove-team', function(event){
+    $(event.target).closest('div.team').remove();
+  });
+
+  $('.btn-add-team').on('click', function(event){
+    var $new_team = $team_default.clone().removeClass('hidden').removeAttr('id');
+    var $new_member = $name_default.clone().removeClass('hidden').removeAttr('id');
+    $new_member.find('button.btn-remove-name').prop('disabled', true);
+    $new_team.find('ul.name-list').append($new_member);
+    $('.team-row').append($new_team);
+  });
+
+});
+</script>
+
+<!-- Calculation -->
+<script>
+function fetch_data(){
+  var data = [];
+  $('div.team:not(#team-default)').each(function(index){
+    var title = $(this).find('input.team-title').val();
+    var vote = parseInt($(this).find('input.team-vote').val());
+    var member = [];
+
+    $(this).find('input.team-member').each(function(index){
+      member.push($(this).val());
+    });
+    data.push({
+      title: title,
+      vote: vote,
+      member: member
+    });
+  });
+
+  return data;
+}
+
+function prepare_data(data){
+  var total_vote = 0;
+  var total_team = data.length;
+  var total_seat = parseInt($('input#total-seat').val());
+  var vote_per_seat, remaining_seat;
+
+  data.forEach(function(item, index){
+    total_vote += item['vote'];
+  });
+
+  vote_per_seat = total_vote/total_seat;
+  remaining_seat = total_seat;
+
+  data.forEach(function(item, index){
+    item['remaining_vote'] = item['vote'];
+    item['distributed_vote'] = [];
+
+    while (item['remaining_vote'] >= vote_per_seat) {
+      if (item['distributed_vote'].length === item['member'].length) {
+        item['remaining_vote'] = 0;
+        break;
+      }
+
+      item['remaining_vote'] -= vote_per_seat;
+      item['distributed_vote'].push(vote_per_seat);
+      --remaining_seat;
+    }
+
+    if (item['distributed_vote'].length === item['member'].length) {
+      item['remaining_vote'] = 0;
+    }
+  });
+
+  if (remaining_seat > 0) {
+    data.sort(function(item1, item2) {
+      return item2['remaining_vote'] - item1['remaining_vote'];
+    });
+
+    data.forEach(function(item, index) {
+      if (remaining_seat > 0) {
+        --remaining_seat;
+        item['distributed_vote'].push(item['remaining_vote']);
+        item['remaining_vote'] = 0;
+      }
+    });
+  }
+
+  console.log(remaining_seat);
+  console.log(data);
+
+  return data;
+}
+
+function prepare_chart_data(data) {
+  var result = new google.visualization.DataTable();
+  var rows = []
+
+  result.addColumn('string', 'From');
+  result.addColumn('string', 'To');
+  result.addColumn('number', 'Weight');
+
+  data.forEach(function(item, index) {
+    rows.push(['Total', item['title'], item['vote']]);
+    item['distributed_vote'].forEach(function(voted, index) {
+      rows.push([item['title'], item['member'][index], voted]);
+    });
+    rows.push([item['title'], '', 0.1]);
+  });
+  result.addRows(rows);
+  console.log(rows);
+
+  return result;
+}
+</script>
+
+<!-- Google Chart -->
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<script>
+$(document).ready(function() {
+  google.charts.load('current', {'packages':['sankey']});
+  google.charts.setOnLoadCallback(drawChart);
+
+  function drawChart() {
+    // Sets chart options.
+    var options = {
+      width: 600,
+      height: 400,
+      sankey: {
+        iterations: 100
+      }
+    };
+    // Instantiates and draws our chart, passing in some options.
+    var chart = new google.visualization.Sankey(document.getElementById('chart'));
+
+
+    $('.btn-calc').on('click', function(event){
+      var data = fetch_data();
+      var cleaned_data = prepare_data(data);
+      var chart_data = prepare_chart_data(cleaned_data);
+
+      chart.draw(chart_data, options);
+    });
+
+  }
+});
+</script>
